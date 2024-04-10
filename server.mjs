@@ -5,8 +5,15 @@ export default class Server {
     }
 
     start = () => {
-        this.app.get('/', (req, res) => {
-            res.send('Hello World!')
+        this.app.use(function (req, res, next) {
+            res.setHeader("Access-Control-Allow-Origin", "*");
+            res.setHeader("Access-Control-Allow-Methods", "*");
+            res.setHeader("Access-Control-Allow-Headers", "*");
+            next();
+        })
+        
+        this.app.get("/", (req, res) => {
+            res.send("Hello World!")
         })
 
         this.app.listen(this.port, () => {
