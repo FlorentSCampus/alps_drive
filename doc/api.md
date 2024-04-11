@@ -2,10 +2,10 @@
 
 |DEF|PARAMS|STRUCTURE|
 |-|-|-|
-|GET <br> api/x/tweets/:username/:count|<br><br> required ID user <br> required tweets number|<br><a href="#get-tweets">see</a>|
-|POST <br> api/x/follow/:username|<br> required ID user|<br>/|
-|POST <br> api/x/unfollow/:username|<br> required ID user|<br>/|
-|POST <br> api/x/toggleFollow/:username|<br> required ID user|<br>/|
+|GET <br> api/x/{username}/tweets?sort=date&order=desc|<br><br> required ID user <br> required tweets number|<br><a href="#get-tweets">see</a>|
+|POST <br> api/x/{username}?follow=0|<br> required ID user|<br>/|
+|POST <br> api/x/{username}?unfollow=1|<br> required ID user|<br>/|
+|POST <br> api/x/{username}?toggleFollow=0|<br> required ID user|<br>/|
 
 <br>
 
