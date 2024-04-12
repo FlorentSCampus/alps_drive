@@ -30,10 +30,10 @@ export default class Server {
         })
 
         this.createTmpFolder()
-        this.getDirs()
+        this.getContent()
     }
 
-    getDirs = (dirPath = this.dirPath) => {
+    getContent = (dirPath = this.dirPath) => {
         this.app.get("/api/drive", async (req, res, next) => {
             try {
                 const files = await this.fs.promises.readdir(dirPath, { withFileTypes: true })
@@ -47,13 +47,17 @@ export default class Server {
 
                 return res.status(200).send(filesFormat)
             } catch (err) {
-                return res.status(500).send(`Cannot get directories: ${err}`)
+                return res.status(500).send(`Cannot get contents: ${err}`)
             }
         })
     }
 
     getName = (req) => {
-        return req.query.name !== undefined ? req.query.name : req.params.name
+        const name = req.query.name !== undefined ? req.query.name : req.params.name
+        const regex = /^[a-zA-Z0-9_-]+$/
+        const isValid = regex.test(name)
+
+        return isValid ? name : false
     }
 
     createTmpFolder = () => {
@@ -65,25 +69,29 @@ export default class Server {
     createDir = () => {
         this.app.post("/api/drive", async (req, res, next) => {
             const name = this.getName(req)
-            const dirPath = this.path.join(this.dirPath, "/", name)
 
             try {
+                const dirPath = this.path.join(this.dirPath, "/", name)
                 await this.fs.promises.mkdir(dirPath, { recursive: true })
                 return res.sendStatus(201)
             } catch (err) {
-                return res.status(500).send(`Cannot create (POST) the directory: ${err}`)
+                return res.status(500).send(`Cannot create (POST) directory: ${err}`)
             }
         })
     }
 
-    deleteDir = () => {
+    putFile = () => {
+        
+    }
+
+    deleteContent = () => {
         this.app.delete("/api/drive/:name", (req, res, next) => {
             const name = this.getName(req)
             const dirPath = this.path.join(this.dirPath, "/", name)
 
             this.fs.rm(dirPath, { recursive: true }, (err) => {
                 if (err) {
-                    return res.status(500).send(`Cannot delete the directory: ${err}`)
+                    return res.status(500).send(`Cannot delete content: ${err}`)
                 } else {
                     return res.sendStatus(200)
                 }
