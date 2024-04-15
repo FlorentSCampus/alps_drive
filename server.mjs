@@ -1,13 +1,13 @@
 export default class Server {
-    constructor(express, fs, os, path, process, port) {
+    constructor(express, bb, fs, os, path, port) {
         this.dirName = "/alps_drive"
 
         this.app = express
+        this.bb = bb
         this.fs = fs
         this.os = os
         this.path = path
         this.port = port
-        this.process = process
 
         this.tmp = os.tmpdir()
         this.dirPath = this.tmp + this.dirName
@@ -28,6 +28,8 @@ export default class Server {
         this.app.listen(this.port, () => {
             console.log(`Example app listening on port ${this.port}`)
         })
+
+        this.bb.extend(this.app, { upload: true, path: "/tmp/busboy" })
 
         this.createTmpFolder()
         this.getContent()
@@ -52,12 +54,10 @@ export default class Server {
         })
     }
 
-    getName = (req) => {
-        const name = req.query.name !== undefined ? req.query.name : req.params.name
-        const regex = /^[a-zA-Z0-9_-]+$/
-        const isValid = regex.test(name)
+    getName = (name) => {
+        const regex = /^[\w\d\-]+(\.[\w\d\-]+)?$/
 
-        return isValid ? name : false
+        return name.match(regex) ? name : false
     }
 
     createTmpFolder = () => {
@@ -68,10 +68,10 @@ export default class Server {
 
     createDir = () => {
         this.app.post("/api/drive", async (req, res, next) => {
-            const name = this.getName(req)
+            const name = this.getName(req.query.name)
 
             try {
-                const dirPath = this.path.join(this.dirPath, "/", name)
+                const dirPath = this.path.join(this.dirPath, name)
                 await this.fs.promises.mkdir(dirPath, { recursive: true })
                 return res.sendStatus(201)
             } catch (err) {
@@ -81,19 +81,31 @@ export default class Server {
     }
 
     putFile = () => {
-        
+        this.app.put("/api/drive", (req, res, next) => {
+            const file = req.files.file
+            const fileName = this.path.join(this.dirPath, this.getName(file.filename))
+
+            this.fs.rename(file.file, fileName, (err) => {
+                if (!err) {
+                    return res.sendStatus(200)
+                } else {
+                    return res.status(500).send(`Error uploaded file: ${err}`)
+                }
+            })
+        })
+
     }
 
     deleteContent = () => {
         this.app.delete("/api/drive/:name", (req, res, next) => {
-            const name = this.getName(req)
-            const dirPath = this.path.join(this.dirPath, "/", name)
+            const name = this.getName(req.params.name)
+            const dirPath = this.path.join(this.dirPath, name)
 
             this.fs.rm(dirPath, { recursive: true }, (err) => {
-                if (err) {
-                    return res.status(500).send(`Cannot delete content: ${err}`)
-                } else {
+                if (!err) {
                     return res.sendStatus(200)
+                } else {
+                    return res.status(500).send(`Cannot delete content: ${err}`)
                 }
             })
         })
