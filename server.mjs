@@ -2,14 +2,13 @@ import { Helper } from "./helper.mjs"
 import { Drive } from "./drive.mjs"
 
 import express from "express"
-import bb from "express-busboy"
+import bb, { extend } from "express-busboy"
 
 import os from "node:os"
 import path from "node:path"
 
 export class Server {
     constructor(port, tmpDirName, drivePath) {
-        this.helper = new Helper()
         this.drive = new Drive()
 
         this.port = port
@@ -62,7 +61,7 @@ export class Server {
 
     _postConfig = () => {
         const onRequest = async (req, res, next) => {
-            if (!this.helper.isValidName(req.query.name)) {
+            if (!Helper.isValidName(req.query.name)) {
                 return res.status(400).send(`${req.query.name} is an illegal name`)
             }
 
@@ -79,7 +78,7 @@ export class Server {
 
     _putConfig = () => {
         const onRequest = async (req, res, next) => {
-            if (!this.helper.isValidName(req.files.file.filename)) {
+            if (!Helper.isValidName(req.files.file.filename)) {
                 return res.status(400).send(`${req.files.file.filename} is an illegal name`)
             }
 
