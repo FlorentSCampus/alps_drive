@@ -1,138 +1,109 @@
-export default class Server {
-    constructor(express, bb, fs, os, path, port) {
-        this.dirName = "/alps_drive"
+import { Helper } from "./helper.mjs"
+import { Drive } from "./drive.mjs"
 
-        this.app = express
-        this.bb = bb
-        this.fs = fs
-        this.os = os
-        this.path = path
+import express from "express"
+import bb from "express-busboy"
+
+import os from "node:os"
+import path from "node:path"
+
+export class Server {
+    constructor(port, tmpDirName, drivePath) {
+        this.helper = new Helper()
+        this.drive = new Drive()
+
         this.port = port
 
-        this.tmp = os.tmpdir()
-        this.dirPath = this.tmp + this.dirName
+        this.tmpDirName = tmpDirName
+        this.tmpDirPath = os.tmpdir() + this.tmpDirName
+
+        this.drivePath = drivePath
+
+        this.app = express()
     }
 
-    start = () => {
+    config = async () => {
         this.app.use((req, res, next) => {
             res.setHeader("Access-Control-Allow-Origin", "*")
             res.setHeader("Access-Control-Allow-Methods", "*")
             res.setHeader("Access-Control-Allow-Headers", "*")
+            res.setHeader("Cache-Control", "no-store")
             next()
         })
-        
-        this.app.get("/", (req, res) => {
-            res.send("Hello World!")
-        })
 
+        bb.extend(this.app, { upload: true, path: "/tmp/busboy" })
+
+        this._getConfig()
+        this._postConfig()
+        this._putConfig()
+        this._deleteConfig()
+
+        await this.drive._setTmpDir(this.tmpDirPath)
+    }
+
+    start = () => {
         this.app.listen(this.port, () => {
             console.log(`Example app listening on port ${this.port}`)
         })
-
-        this.bb.extend(this.app, { upload: true, path: "/tmp/busboy" })
-
-        this.createTmpFolder()
-        this.getContent()
     }
 
-    getContent = (dirPath = this.dirPath) => {
-        this.app.get("/api/drive", async (req, res, next) => {
+    _getConfig = () => {
+        const onRequest = async (req, res, next) => {
             try {
-                const files = await this.fs.promises.readdir(dirPath, { withFileTypes: true })
-                const filesFormat = files.map(file => {
-                    return {
-                        name: file.name,
-                        size: this.fs.statSync(this.path.join(dirPath, file.name)).size,
-                        isFolder: file.isDirectory()
-                    }
-                })
-
-                return res.status(200).send(filesFormat)
-            } catch (err) {
-                return res.status(500).send(`Cannot get contents: ${err}`)
+                const contents = await this.drive._getContents(this.tmpDirPath, req.params.name)
+                return res.status(200).send(contents)
+            } catch (e) {
+                return res.status(500).send(`Cannot get contents: ${e}`)
             }
-        })
-    }
-
-    getName = (name) => {
-        const regex = /^[\w\d\-]+(\.[\w\d\-]+)?$/
-
-        return name.match(regex) ? name : false
-    }
-
-    createTmpFolder = () => {
-        if (!this.fs.existsSync(this.dirPath)) {
-            this.fs.promises.mkdir(this.dirPath, { recursive: true })
         }
+
+        this.app.get(this.drivePath, onRequest)
     }
 
-    createDir = () => {
-        this.app.post("/api/drive", async (req, res, next) => {
-            const name = this.getName(req.query.name)
+    _postConfig = () => {
+        const onRequest = async (req, res, next) => {
+            if (!this.helper.isNameValid(req.query.name)) {
+                return res.status(400).send(`${req.query.name} is an illegal name`)
+            }
 
             try {
-                const dirPath = this.path.join(this.dirPath, name)
-                await this.fs.promises.mkdir(dirPath, { recursive: true })
-                return res.sendStatus(201)
-            } catch (err) {
-                return res.status(500).send(`Cannot create (POST) directory: ${err}`)
+                const createDir = await this.drive._setDir(path.join(this.tmpDirPath, req.params.name), req.query.name)
+                return res.status(201).send(createDir)
+            } catch (e) {
+                return res.status(500).send(`Cannot create directory: ${e}`)
             }
-        })
+        }
+
+        this.app.post(this.drivePath, onRequest)
     }
 
-    putFile = () => {
-        this.app.put("/api/drive", (req, res, next) => {
-            const file = req.files.file
-            const fileName = this.path.join(this.dirPath, this.getName(file.filename))
+    _putConfig = () => {
+        const onRequest = async (req, res, next) => {
+            if (!this.helper.isNameValid(req.files.file.filename)) {
+                return res.status(400).send(`${req.files.file.filename} is an illegal name`)
+            }
 
-            this.fs.rename(file.file, fileName, (err) => {
-                if (!err) {
-                    return res.sendStatus(200)
-                } else {
-                    return res.status(500).send(`Error uploaded file: ${err}`)
-                }
-            })
-        })
-
-    }
-
-    deleteContent = () => {
-        this.app.delete("/api/drive/:name", (req, res, next) => {
-            const name = this.getName(req.params.name)
-            const dirPath = this.path.join(this.dirPath, name)
-
-            this.fs.rm(dirPath, { recursive: true }, (err) => {
-                if (!err) {
-                    return res.sendStatus(200)
-                } else {
-                    return res.status(500).send(`Cannot delete content: ${err}`)
-                }
-            })
-        })
-    }
-
-    /**
-     * TO DO LATER
-     */
-    changeDir = () => {
-        this.app.get("/api/drive/:name", async (req, res, next) => {
             try {
-                const name = this.getName(req)
-                const dirPath = this.path.resolve(this.dirPath + "/" + name)
-                console.log(dirPath);
-                // const dirPath = this.dirPath + "/" + name
-                const files = await this.fs.promises.readdir(dirPath, { withFileTypes: true })
-                const filesFormat = files.map(file => {
-                    return {
-                        name: file.name,
-                        isFolder: file.isDirectory()
-                    }
-                })
-
-                return res.status(200).send(filesFormat)
-            } catch (err) {
-                return res.status(500).send(`Cannot changed directory: ${err}`)
+                const uploadFile = await this.drive._putFile(path.join(this.tmpDirPath, req.params.name, req.files.file.filename), req)
+                return res.status(200).send(uploadFile)
+            } catch (e) {
+                return res.status(500).send(`Cannot upload file: ${e}`)
             }
-        })
+        }
+
+        this.app.put(this.drivePath, onRequest)
+    }
+
+    _deleteConfig = () => {
+        const onRequest = async (req, res, next) => {
+            try {
+                const deleteContent = await this.drive._deleteContent(path.join(this.tmpDirPath, req.params.name), req.params.name)
+                return res.status(200).send(deleteContent)
+            } catch (e) {
+                return res.status(500).send(`Cannot delete content: ${e}`)
+            }
+        }
+
+        this.app.delete(this.drivePath, onRequest)
     }
 }
