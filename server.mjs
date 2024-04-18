@@ -62,7 +62,7 @@ export class Server {
 
     _postConfig = () => {
         const onRequest = async (req, res, next) => {
-            if (!this.helper.isNameValid(req.query.name)) {
+            if (!this.helper.isValidName(req.query.name)) {
                 return res.status(400).send(`${req.query.name} is an illegal name`)
             }
 
@@ -79,7 +79,7 @@ export class Server {
 
     _putConfig = () => {
         const onRequest = async (req, res, next) => {
-            if (!this.helper.isNameValid(req.files.file.filename)) {
+            if (!this.helper.isValidName(req.files.file.filename)) {
                 return res.status(400).send(`${req.files.file.filename} is an illegal name`)
             }
 
