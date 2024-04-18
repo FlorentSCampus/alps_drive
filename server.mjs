@@ -2,7 +2,7 @@ import { Helper } from "./helper.mjs"
 import { Drive } from "./drive.mjs"
 
 import express from "express"
-import bb, { extend } from "express-busboy"
+import bb from "express-busboy"
 
 import os from "node:os"
 import path from "node:path"
@@ -61,15 +61,15 @@ export class Server {
 
     _postConfig = () => {
         const onRequest = async (req, res, next) => {
-            if (!Helper.isValidName(req.query.name)) {
+            if (Helper.isValidName(req.query.name)) {
+                try {
+                    const createDir = await this.drive._setDir(path.join(this.tmpDirPath, req.params.name), req.query.name)
+                    return res.status(201).send(createDir)
+                } catch (e) {
+                    return res.status(500).send(`Cannot create directory: ${e}`)
+                }
+            } else {
                 return res.status(400).send(`${req.query.name} is an illegal name`)
-            }
-
-            try {
-                const createDir = await this.drive._setDir(path.join(this.tmpDirPath, req.params.name), req.query.name)
-                return res.status(201).send(createDir)
-            } catch (e) {
-                return res.status(500).send(`Cannot create directory: ${e}`)
             }
         }
 
@@ -78,15 +78,15 @@ export class Server {
 
     _putConfig = () => {
         const onRequest = async (req, res, next) => {
-            if (!Helper.isValidName(req.files.file.filename)) {
+            if (Helper.isValidName(req.files.file.filename)) {
+                try {
+                    const uploadFile = await this.drive._putFile(path.join(this.tmpDirPath, req.params.name, req.files.file.filename), req)
+                    return res.status(200).send(uploadFile)
+                } catch (e) {
+                    return res.status(500).send(`Cannot upload file: ${e}`)
+                }
+            } else {
                 return res.status(400).send(`${req.files.file.filename} is an illegal name`)
-            }
-
-            try {
-                const uploadFile = await this.drive._putFile(path.join(this.tmpDirPath, req.params.name, req.files.file.filename), req)
-                return res.status(200).send(uploadFile)
-            } catch (e) {
-                return res.status(500).send(`Cannot upload file: ${e}`)
             }
         }
 
