@@ -1,20 +1,14 @@
-import express from "express"
-import bb from "express-busboy"
-import fs from "fs"
-import os from "os"
-import path from "path"
-
-import Server from "./server.mjs"
+import { Server } from "./server.mjs"
 
 const port = 3000
-const server = new Server(express(), bb, fs, os, path, port)
+const tmpDirName = "/alps_drive"
+const drivePath = "/api/drive/:name(*)"
 
-server.start()
-server.createDir()
-server.putFile()
-server.deleteContent()
+const server = new Server(port, tmpDirName, drivePath)
 
-// //
-
-// TO DO LATEER
-// server.changeDir()
+server.config()
+    .then(() => {
+        server.start()
+    }).catch(e => {
+        console.error("Cannot launch server", e)
+    })
